@@ -1,0 +1,13 @@
+version: '3.8'
+
+services:
+  service-a-cep:
+    build:
+      context: ./service-a-cep
+      dockerfile: Dockerfile
+  service-b-climate:
+    build:
+      context: ./service-b-climate
+      dockerfile: Dockerfile
+
+    
