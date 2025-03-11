@@ -1,8 +1,12 @@
 package weatherapi
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
+	"go.opentelemetry.io/contrib/instrumentation/net/http/otelhttp"
+	"go.opentelemetry.io/otel"
+	"go.opentelemetry.io/otel/propagation"
 	"io"
 	"log"
 	"net/http"
@@ -23,14 +27,32 @@ func NewWeatherApi(url string, key string) services.ClimaApiInterface {
 	}
 }
 
-func (w *weatherapi) GetCurrentClimate(locaty string) (*entities.CurrentClimate, error) {
+func (w *weatherapi) GetCurrentClimate(ctx context.Context, locaty string) (*entities.CurrentClimate, error) {
 	service := fmt.Sprintf("/v1/current.json?q=%s&key=%s", locaty, w.key)
 	url := w.url + service
-	resp, err := http.Get(url)
+
+	req, err := http.NewRequestWithContext(context.Background(), "GET", url, nil)
 	if err != nil {
-		return nil, fmt.Errorf("error to execute request, %w", err)
+		return nil, fmt.Errorf("error to get request, %w", err)
 	}
-	defer resp.Body.Close()
+
+	var headers = propagation.HeaderCarrier{}
+	for _, value := range req.Header {
+		headers.Set(value[0], value[1])
+	}
+	otel.GetTextMapPropagator().Inject(ctx, headers)
+
+	client := http.Client{
+		Transport: otelhttp.NewTransport(http.DefaultTransport),
+	}
+
+	resp, err := client.Do(req)
+	defer func(Body io.ReadCloser) {
+		errClose := Body.Close()
+		if errClose != nil {
+			log.Println("error closing response body")
+		}
+	}(resp.Body)
 
 	body, err := io.ReadAll(resp.Body)
 	if err != nil {

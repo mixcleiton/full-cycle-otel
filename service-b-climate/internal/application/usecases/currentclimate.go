@@ -1,7 +1,9 @@
 package usecases
 
 import (
+	"context"
 	"errors"
+	"fmt"
 
 	"br.com.cleiton/service-b-climate/internal/domain/entities"
 	"br.com.cleiton/service-b-climate/internal/interfaces/services"
@@ -9,7 +11,7 @@ import (
 )
 
 type CurrentClimateInterface interface {
-	GetCurrentClimate(locality string) (*entities.CurrentClimate, error)
+	GetCurrentClimate(ctx context.Context, locality string) (*entities.CurrentClimate, error)
 }
 
 const valueConvertFahrenheit = 273
@@ -28,11 +30,11 @@ func NewCurrentClimateUsecase(climateApi services.ClimaApiInterface) CurrentClim
 	}
 }
 
-func (c CurrentClimate) GetCurrentClimate(locality string) (*entities.CurrentClimate, error) {
-	climateResponse, err := c.climateApi.GetCurrentClimate(locality)
+func (c CurrentClimate) GetCurrentClimate(ctx context.Context, locality string) (*entities.CurrentClimate, error) {
+	climateResponse, err := c.climateApi.GetCurrentClimate(ctx, locality)
 	if err != nil {
 		log.Printf("error in api current climate, err: %s", err)
-		return nil, ErrClimate
+		return nil, fmt.Errorf("error in get currnet climate %w", err)
 	}
 
 	climateResponse.TempK = climateResponse.TempC + valueConvertFahrenheit

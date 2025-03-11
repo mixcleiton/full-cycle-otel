@@ -1,13 +1,116 @@
-version: '3.8'
 
 services:
+#  jaeger:
+#    container_name: jaeger
+#    image: jaegertracing/all-in-one:latest
+#    restart: always
+#    ports:
+#      - "16686:16686"
+#      - "14268"
+#      - "14250"
+#    networks:
+#      - zipcode-temperature-tracing
+
+  prometheus:
+    container_name: prometheus
+    hostname: prometheus
+    restart: always
+    image: prom/prometheus:latest
+    ports:
+      - 9090:9090
+    volumes:
+      - ./docker/prometheus.yaml:/etc/prometheus/prometheus.yml
+    healthcheck:
+      test: [ "CMD-SHELL", "wget --spider --no-verbose --tries=1 --timeout=5 http://localhost:9090/-/healthy || exit 1" ]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+    networks:
+      - zipcode-temperature-tracing
+
+  grafana:
+    container_name: grafana
+    hostname: grafana
+    restart: always
+    image: grafana/grafana:latest
+    ports:
+      - 3000:3000
+    depends_on:
+      prometheus:
+        condition: service_healthy
+    healthcheck:
+      test: [ "CMD-SHELL", "wget --spider --no-verbose --tries=1 --timeout=5 http://localhost:3000/api/health || exit 1" ]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+    networks:
+      - zipcode-temperature-tracing
+
+  zipkin:
+    container_name: zipkin
+    hostname: zipkin
+    restart: always
+    image: openzipkin/zipkin:latest
+    ports:
+      - "9411:9411" # Port used for the Zipkin UI and HTTP Api
+    environment:
+      - STORAGE_TYPE=mem
+      - JAVA_OPTS=-Xms1024m -Xmx1024m -XX:+ExitOnOutOfMemoryError
+    healthcheck:
+      test: [ "CMD-SHELL", "wget --spider --no-verbose --tries=1 --timeout=5 http://localhost:9411/health || exit 1" ]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+    networks:
+      - zipcode-temperature-tracing
+
+
+  otel-collector:
+    container_name: otel-collector
+    hostname: otel-collector
+    restart: always
+    image: otel/opentelemetry-collector:latest
+    command: ["--config=/etc/otelprovider-collector-config.yaml"]
+    ports:
+      - 1888:1888   # pprof extension
+      - 8888:8888   # Prometheus metrics exposed by the collector
+      - 8889:8889   # Prometheus exporter metricsd
+      - 13133:13133 # health_check extension
+      - 4317:4317   # OTLP gRPC receiver
+      - 55679:55679 # zpages extension
+    volumes:
+      - ./docker/otelprovider-collector-config.yaml:/etc/otelprovider-collector-config.yaml
+    depends_on:
+      - zipkin
+    networks:
+      - zipcode-temperature-tracing
+
   service-a-cep:
+    container_name: service-a-cep
+    hostname: service-a-cep
     build:
       context: ./service-a-cep
       dockerfile: Dockerfile
+    depends_on:
+      - otel-collector
+    ports:
+      - 8081:8081
+    networks:
+      - zipcode-temperature-tracing
+
   service-b-climate:
+    container_name: service-b-climate
+    hostname: service-a-climate
     build:
       context: ./service-b-climate
       dockerfile: Dockerfile
+    ports:
+      - 8082:8082
+    depends_on:
+      - service-a-cep
+    networks:
+      - zipcode-temperature-tracing
 
-    
+networks:
+  zipcode-temperature-tracing:
+    driver: bridge

@@ -1,7 +1,11 @@
 package services
 
-import "br.com.cleiton/service-a-cep/internal/domain/entities"
+import (
+	"br.com.cleiton/service-a-cep/internal/domain/entities"
+	"context"
+	"net/http/httptrace"
+)
 
 type ClimateInterface interface {
-	GetClimate(locality string) (*entities.CurrentClimate, error)
+	GetClimate(ctx context.Context, locality string, trace *httptrace.ClientTrace) (*entities.CurrentClimate, error)
 }

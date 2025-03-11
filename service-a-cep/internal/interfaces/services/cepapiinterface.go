@@ -1,7 +1,11 @@
 package services
 
-import "br.com.cleiton/service-a-cep/internal/domain/entities"
+import (
+	"br.com.cleiton/service-a-cep/internal/domain/entities"
+	"context"
+	"net/http/httptrace"
+)
 
 type CepApiInterface interface {
-	GetLocation(cep int) (*entities.CEP, error)
+	GetLocation(ctx context.Context, cep int, traceClient *httptrace.ClientTrace) (*entities.CEP, error)
 }
